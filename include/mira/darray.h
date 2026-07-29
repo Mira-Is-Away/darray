@@ -58,6 +58,14 @@ typedef union {
 #define DARRAY_FOREACH(type, elem, arr) \
     for (type *elem = (arr); elem != (arr) + DARRAY_SIZE(arr); ++elem)
 
+/* 
+ * Reserves memory for at least 'new_cap' elements. 
+ * If the current capacity is already greater than or equal to 'new_cap', 
+ * this does nothing.
+ */
+#define DARRAY_RESERVE(arr, new_cap) \
+    ((arr) = mira_darray_reserve_impl((arr), sizeof(*(arr)), (new_cap)))
+
 #define DARRAY_FREE(arr) \
     do { \
         if (arr) { \
@@ -66,22 +74,25 @@ typedef union {
         } \
     } while(0)
 
-/* Internal allocation function declaration */
+/* Internal allocation function declarations */
+void* mira_darray_reserve_impl(void* arr, size_t elem_size, size_t new_cap);
 void* mira_darray_grow_impl(void* arr, size_t elem_size);
 
 #ifdef MIRA_DARRAY_IMPL
 
-void* mira_darray_grow_impl(void* arr, size_t elem_size) {
-    size_t cap = arr ? mira_darray_meta(arr)->d.capacity : 0;
-    /* Start at 16, double if capacity is exceeded */
-    size_t new_cap = cap ? cap * 2 : 16;
-    size_t new_size = sizeof(mira_darray_header) + (new_cap * elem_size);
+void* mira_darray_reserve_impl(void* arr, size_t elem_size, size_t new_cap) {
+    size_t current_cap = arr ? mira_darray_meta(arr)->d.capacity : 0;
     
-    mira_darray_header *hdr = arr ? mira_darray_meta(arr) : NULL;
-    mira_darray_header *new_hdr = (mira_darray_header*)realloc(hdr, new_size);
+    if (new_cap <= current_cap) {
+        return arr;
+    }
+    
+    size_t new_size = sizeof(mira_darray_header) + (new_cap * elem_size);
+    mira_darray_header* hdr = arr ? mira_darray_meta(arr) : NULL;
+    mira_darray_header* new_hdr = (mira_darray_header*)realloc(hdr, new_size);
     
     if (!new_hdr) {
-        /* Allocation failed. You might want to abort(). */
+        /* Allocation failed. */
         return NULL;
     }
     
@@ -90,8 +101,15 @@ void* mira_darray_grow_impl(void* arr, size_t elem_size) {
     }
     new_hdr->d.capacity = new_cap;
     
-    /* Return the memory address immediately following the header */
-    return (void *)(new_hdr + 1);
+    return (void*)(new_hdr + 1);
+}
+
+void* mira_darray_grow_impl(void* arr, size_t elem_size) {
+    size_t cap = arr ? mira_darray_meta(arr)->d.capacity : 0;
+    /* Start at 16, double if capacity is exceeded */
+    size_t new_cap = cap ? cap * 2 : 16;
+    
+    return mira_darray_reserve_impl(arr, elem_size, new_cap);
 }
 
 #endif /* MIRA_DARRAY_IMPL */
