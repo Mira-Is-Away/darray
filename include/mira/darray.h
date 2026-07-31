@@ -4,7 +4,21 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-/* This macro's only purpose it so  */
+/*
+ * MSVC doesn't always define max_align_t, even if you include <stddef.h>.
+ * Go figure.
+ */
+#if defined(_MSC_VER) && !defined(__clang__)
+#  ifndef _MAX_ALIGN_T_DEFINED
+typedef struct {
+    long long __max_align_ll;
+    long double __max_align_ld;
+} max_align_t;
+#    define _MAX_ALIGN_T_DEFINED
+#  endif
+#endif
+
+/* This macro's only purpose it readability */
 #define DARRAY(T) T*
 
 /* 
